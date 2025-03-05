@@ -1,5 +1,3 @@
-﻿# ReverseEdge
-
 # How to use it ?
 
 You can just git clone the project and build this project, it will create you a .dll file in build folder.
