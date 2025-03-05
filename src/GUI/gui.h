@@ -1,14 +1,19 @@
 #pragma once
+#ifndef GUI_H
+#define GUI_H
+
+#include <windows.h>
 #include <unordered_map>
 #include <string>
 #include "ImGui/imgui.h"
-#include "../../Include/GLFW/glfw3.h"
+
+
 
 class ImGuiWrapper {
 public:
     ImGuiWrapper() = default;
 
-    void InitGui(GLFWwindow* window);
+    void InitGui(HWND hwnd);
     void RenderGui();
     void ShutdownGui();
 
@@ -20,3 +25,5 @@ public:
 private:
     std::unordered_map<std::string, ImFont*> fonts; // Stocke les polices chargées
 };
+
+#endif

@@ -1,145 +1,205 @@
-#include <windows.h>
+ï»¿#include <Windows.h>
 #include <iostream>
 #include <gl/GL.h>
-#include <MINHOOK/MinHook.h>
-#include "../Include/GLFW/glfw3.h"
-#include "../Include/GLAD/glad.h"
+#include "ImGui/imgui.h"
+#include "MINHOOK/MinHook.h"
+#include "ImGui/backends/imgui_impl_win32.h"
+#include "ImGui/backends/imgui_impl_opengl3.h"
+#include <thread>
+
 #include "GUI/gui.h"
 
+// Variables globales
+bool g_initialized = false;
+bool g_wallhack = false;
+HWND g_hwnd = nullptr;
+HDC g_hdc = nullptr;
+HGLRC g_hglrc = nullptr;
+ImGuiWrapper* gui;
+bool showMenu = true;
 
-// Déclarer les variables globales
-GLFWwindow* g_Window = nullptr;
-ImGuiWrapper* gui = nullptr;
+// DÃ©claration du gestionnaire de messages ImGui
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-
-// Typedef et pointeur vers la fonction originale
-typedef int(__fastcall* wglSwapBuffersPtr)(HDC);
-wglSwapBuffersPtr originalSwapBuffers = nullptr;
-
-// Detour function
-int __fastcall HookedwglSwapBuffers(HDC hdc)
+// Hook pour WndProc pour capturer les entrÃ©es
+WNDPROC original_wndproc = nullptr;
+LRESULT CALLBACK Hooked_WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-    if (!wglGetCurrentContext() || !gui)
-        return originalSwapBuffers(hdc);
+    if (g_initialized && showMenu)
+    {
+        if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+            return true; // Bloque les Ã©vÃ©nements souris/clavier si ImGui les utilise
 
-    // Démarrer la nouvelle frame ImGui
-    gui->InitGui(g_Window);
+        ImGuiIO& io = ImGui::GetIO();
+        if (io.WantCaptureMouse || io.WantCaptureKeyboard)
+            return true; // Ne passe pas l'Ã©vÃ©nement au jeu
+    }
 
-    // Récupérer le Background Draw List d'ImGui pour dessiner directement sur le jeu
-    ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
-
-    // Exemples de dessin dans le jeu :
-    // 1. Ligne rouge
-    draw_list->AddLine(ImVec2(50, 80), ImVec2(200, 200), IM_COL32(255, 0, 0, 255), 2.0f);
-
-    // 2. Cercle bleu
-    draw_list->AddCircle(ImVec2(300, 300), 50, IM_COL32(0, 0, 255, 255), 0, 3.0f);
-
-    // 3. Texte vert (exemple d'affichage de FPS)
-    draw_list->AddText(ImVec2(20, 20), IM_COL32(0, 255, 0, 255), "FPS: 60");
-
-    // Fin du rendu ImGui
-    gui->ShutdownGui();
-
-    return originalSwapBuffers(hdc);
+    return CallWindowProc(original_wndproc, hwnd, msg, wparam, lparam);
 }
 
-
-
-DWORD WINAPI HackThread(HMODULE hModule)
+void InitImGui(HWND hwnd, HDC hdc)
 {
-    // Récupérer l'adresse de wglSwapBuffers
-    uintptr_t AddressToHook = (uintptr_t)GetProcAddress(GetModuleHandle("opengl32.dll"), "wglSwapBuffers");
-    if (!AddressToHook)
-    {
-        std::cerr << "Failed to find wglSwapBuffers address!\n";
-        return 1;
-        
-    }
+    // CrÃ©er et sauvegarder le contexte OpenGL
+    g_hglrc = wglCreateContext(hdc);
+    HGLRC old_context = wglGetCurrentContext();
+    HDC old_dc = wglGetCurrentDC();
 
-    // Initialiser GLFW
-    if (!glfwInit())
-    {
-        std::cout << "GLFW init failed\n";
-        return -1;
-    }
-
-    // Configurer et créer la fenêtre GLFW
-    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
-    glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    g_Window = glfwCreateWindow(500, 500, "ReverseEdge", NULL, NULL);
-    if (!g_Window)
-    {
-        std::cout << "Window creation failed\n";
-        glfwTerminate();
-        return -1;
-    }
-
-    // Centrer la fenêtre
-    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-    glfwSetWindowPos(g_Window, (mode->width - 500) / 2, (mode->height - 500) / 2);
-
-    // Activer OpenGL
-    glfwMakeContextCurrent(g_Window);
-    if (!gladLoadGL()) return -1;
+    // Activer notre contexte
+    wglMakeCurrent(hdc, g_hglrc);
 
     // Initialiser ImGui
-    gui = new ImGuiWrapper();
-    gui->InitGui(g_Window);
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+    // Initialiser les backends ImGui
+    ImGui_ImplWin32_Init(hwnd);
+    ImGui_ImplOpenGL3_Init();
+
+    // Hook le WndProc pour capturer les entrÃ©es
+    original_wndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)Hooked_WndProc);
+
+    // Restaurer le contexte original
+    wglMakeCurrent(old_dc, old_context);
+}
+
+void CleanupImGui()
+{
+    // Sauvegarder le contexte actuel
+    HGLRC old_context = wglGetCurrentContext();
+    HDC old_dc = wglGetCurrentDC();
+
+    // Activer notre contexte
+    wglMakeCurrent(g_hdc, g_hglrc);
+
+    // LibÃ©rer ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
+    // Restaurer le WndProc original
+    if (g_hwnd && original_wndproc)
+        SetWindowLongPtr(g_hwnd, GWLP_WNDPROC, (LONG_PTR)original_wndproc);
+
+    // Restaurer le contexte original
+    wglMakeCurrent(old_dc, old_context);
+
+    // Supprimer notre contexte
+    if (g_hglrc)
+        wglDeleteContext(g_hglrc);
+}
+
+// Fonction de swap buffer originale
+typedef BOOL(WINAPI* wglSwapBuffers_t)(HDC);
+wglSwapBuffers_t original_wglSwapBuffers = nullptr;
+
+// Fonction de swap buffer hookÃ©e
+BOOL WINAPI Hooked_wglSwapBuffers(HDC hdc)
+{
+    // Capturer la fenÃªtre si pas encore fait
+    if (!g_hwnd) {
+        g_hwnd = WindowFromDC(hdc);
+        g_hdc = hdc;
+
+        if (g_hwnd && !g_initialized) {
+            InitImGui(g_hwnd, hdc);
+            g_initialized = true;
+        }
+    }
+
+    if (g_initialized) {
+        // Sauvegarder le contexte actuel
+        HGLRC old_context = wglGetCurrentContext();
+        HDC old_dc = wglGetCurrentDC();
+
+        // Activer notre contexte
+        wglMakeCurrent(hdc, g_hglrc);
+
+
+        if (showMenu)  gui->RenderGui();
+
+
+        // Restaurer le contexte original
+        wglMakeCurrent(old_dc, old_context);
+    }
+
+    // Appeler la fonction originale
+    return original_wglSwapBuffers(hdc);
+}
+
+// Thread principal du hack
+DWORD WINAPI HackThread(HMODULE hModule)
+{
+    // Attendre que le jeu s'initialise
+    Sleep(2000);
 
     // Initialiser MinHook
     if (MH_Initialize() != MH_OK)
     {
-        std::cerr << "Failed to initialise MinHook\n";
+        std::cerr << "Failed to initialize MinHook\n";
         return 1;
     }
 
-    // Créer le hook
-    if (MH_CreateHook((LPVOID)AddressToHook, &HookedwglSwapBuffers, (LPVOID*)&originalSwapBuffers) != MH_OK)
+    // Trouver l'adresse de wglSwapBuffers
+    HMODULE opengl_module = GetModuleHandle("opengl32.dll");
+    if (!opengl_module)
+    {
+        std::cerr << "Failed to get OpenGL32.dll handle\n";
+        return 1;
+    }
+
+    wglSwapBuffers_t wglSwapBuffers_addr = (wglSwapBuffers_t)GetProcAddress(opengl_module, "wglSwapBuffers");
+    if (!wglSwapBuffers_addr)
+    {
+        std::cerr << "Failed to get wglSwapBuffers address\n";
+        return 1;
+    }
+
+    // CrÃ©er et activer le hook
+    if (MH_CreateHook(wglSwapBuffers_addr, &Hooked_wglSwapBuffers, (LPVOID*)&original_wglSwapBuffers) != MH_OK)
     {
         std::cerr << "Failed to create hook for wglSwapBuffers\n";
         return 1;
     }
 
-    if (originalSwapBuffers == nullptr)
-    {
-        std::cerr << "Error: originalSwapBuffers is still nullptr!\n";
-        return 1;
-    }
-
-    // Activer le hook
-    if (MH_EnableHook((LPVOID)AddressToHook) != MH_OK)
+    if (MH_EnableHook(wglSwapBuffers_addr) != MH_OK)
     {
         std::cerr << "Failed to enable hook for wglSwapBuffers\n";
         return 1;
     }
 
-    // Boucle principale
-    bool showMenu = true;
-    while (!glfwWindowShouldClose(g_Window))
+    // Boucle principale - attendre END pour quitter
+    while (true)
     {
-        if (GetAsyncKeyState(VK_F10) & 1)
+        if (GetAsyncKeyState(VK_END) & 1)
         {
-            showMenu = !showMenu;
-            if (showMenu) glfwShowWindow(g_Window);
-            else glfwHideWindow(g_Window);
+            CleanupImGui();
+            break;
         }
 
-        glfwPollEvents();
+        if (GetAsyncKeyState(VK_F5) & 1)
+        {
+            // Toggle button
+            showMenu ? showMenu = false : showMenu = true;
+        }
     }
 
     // Nettoyage
-    MH_DisableHook((LPVOID)AddressToHook);
+    if (g_initialized)
+    {
+        CleanupImGui();
+    }
+
+    MH_DisableHook(MH_ALL_HOOKS);
     MH_Uninitialize();
-    gui->ShutdownGui();
-    delete gui;
-    glfwTerminate();
     FreeLibraryAndExitThread(hModule, 0);
     return 0;
 }
 
+// Point d'entrÃ©e DLL
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH)

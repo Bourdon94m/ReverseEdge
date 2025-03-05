@@ -1,14 +1,17 @@
 #include "gui.h"
 #include <iostream>
-#include "ImGui/backends/imgui_impl_glfw.h"
-#include "../../Include/ImGui/imgui.h"
-#include "../../Include/ImGui/backends/imgui_impl_opengl3.h"
 
-bool showMenu = true;
+#include "../ESP/ESP.h"
+#include "ImGui/backends/imgui_impl_win32.h"
+#include "ImGui/imgui.h"
+#include "ImGui/backends/imgui_impl_opengl3.h"
+
+ESP esp;
 
 struct CheatVars {
     bool showMenu = true;
     bool enableAimbot = false;
+    bool linesESP = false;
     float fov = 90.0f;
     float smooth = 5.0f;
     bool boxESP = false;
@@ -20,32 +23,26 @@ struct CheatVars {
 } vars;
 
 
-void ImGuiWrapper::InitGui(GLFWwindow* window) {
-    // Vérification de la version d'ImGui
+void ImGuiWrapper::InitGui(HWND hwnd) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
-    // Configuration de ImGuiIO (optionnel)
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Activer la navigation au clavier
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Load font
-    LoadFont("../../Fonts/Roboto.ttf", 15.0f, "Roboto Thin", io);
-
-    // Style d'ImGui (optionnel)
     ImGui::StyleColorsDark();
 
-    // Initialisation des backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplWin32_Init(hwnd);
     ImGui_ImplOpenGL3_Init("#version 130");
 }
+
 
 
 
 void ImGuiWrapper::RenderGui() {
     // Préparer une nouvelle frame ImGui
     ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
+    ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
     // Appliquer un style moderne
@@ -87,7 +84,6 @@ void ImGuiWrapper::RenderGui() {
     colors[ImGuiCol_TabActive] = ImVec4(0.00f, 0.83f, 1.00f, 1.00f);
 
     // Position et taille de la fenêtre ImGui
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(500, 500), ImGuiCond_Always);
 
     // Début de la fenêtre principale
@@ -123,11 +119,20 @@ void ImGuiWrapper::RenderGui() {
         ImGui::Checkbox("Visible Only", &vars.showMenu);
         ImGui::Checkbox("Auto Fire", &vars.showMenu);
         break;
-
+        
     case 1: // Visuals
         ImGui::Text("Visual Settings");
         ImGui::Separator();
         ImGui::Checkbox("Box ESP", &vars.showMenu);
+
+        // While loop not working : Debug buddy
+        ImGui::Checkbox("Lines ESP", &vars.linesESP);
+        if (vars.linesESP)
+        {
+            esp.DrawLines(); // Appelé en continu tant que la case est cochée
+        }
+        
+
         ImGui::SameLine(200);
         ImGui::ColorEdit3("##BoxColor", (float*)&vars.showMenu, ImGuiColorEditFlags_NoInputs);
         ImGui::Checkbox("Skeleton", &vars.showMenu);
@@ -169,7 +174,7 @@ void ImGuiWrapper::RenderGui() {
 
 void ImGuiWrapper::ShutdownGui() {
     ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
 
