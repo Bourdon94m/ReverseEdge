@@ -6,15 +6,11 @@
 #include <iostream>
 
 
-struct Screen 
-{
-	int WIDTH, HEIGHT;
-};
-
 class Globals 
 {
 public:
-	Screen getScreenSize(HWND hwnd);
+	int getWindowHeight(HWND hwnd);
+	int getWindowWidth(HWND hwnd);
 
 
 };

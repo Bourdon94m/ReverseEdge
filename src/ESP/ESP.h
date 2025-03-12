@@ -38,10 +38,9 @@ public:
 	Vec3 GetEnnemyPos();
 	bool IsEnnemy();
 	bool IsTeammate();
-	void DrawLines();
+	void DrawLines(bool showTeam, float* color);
 	int GetPlayersInGame();
-
-	// void DrawBox(ImVec2 upper-left, ImVec2  lower-right, ImVec4 color, float rounding)  - LATER 
+	void DrawBox(bool showTeam, float* EnnemiColor, float* TeamColor);
 	
 
 };

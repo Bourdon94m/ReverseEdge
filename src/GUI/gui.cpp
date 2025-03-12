@@ -10,16 +10,20 @@ ESP esp;
 
 struct CheatVars {
     bool showMenu = true;
+    bool showTeam = false;
+    bool espBox = false;
     bool enableAimbot = false;
     bool linesESP = false;
     float fov = 90.0f;
     float smooth = 5.0f;
     bool boxESP = false;
-    float boxColor[3] = { 1.0f, 0.0f, 0.0f };
+    float boxEnnemiColor[4] = {255.0f, 0.0f, 0.0f, 1.0f};
+    float boxTeamColor[4] = { 0.0f, 255.0f, 0.0f, 1.0f };
     bool skeleton = false;
     float espDistance = 500.0f;
     bool bhop = false;
     int selectedConfig = 0;
+
 } vars;
 
 
@@ -28,6 +32,10 @@ void ImGuiWrapper::InitGui(HWND hwnd) {
     ImGui::CreateContext();
 
     ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();  // Supprime toutes les polices existantes
+    ImFont* myFont = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/Arial.ttf", 20.0f);
+    io.FontDefault = myFont;  // Définit cette police comme celle par défaut
+    io.Fonts->Build();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     ImGui::StyleColorsDark();
@@ -84,7 +92,7 @@ void ImGuiWrapper::RenderGui() {
     colors[ImGuiCol_TabActive] = ImVec4(0.00f, 0.83f, 1.00f, 1.00f);
 
     // Position et taille de la fenêtre ImGui
-    ImGui::SetNextWindowSize(ImVec2(500, 500), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Always);
 
     // Début de la fenêtre principale
     ImGui::Begin("ReverseEdge",
@@ -123,18 +131,27 @@ void ImGuiWrapper::RenderGui() {
     case 1: // Visuals
         ImGui::Text("Visual Settings");
         ImGui::Separator();
-        ImGui::Checkbox("Box ESP", &vars.showMenu);
+        ImGui::Checkbox("Box ESP", &vars.espBox);
 
-        // While loop not working : Debug buddy
+        // Draw box
+        if (vars.espBox)
+        {
+            esp.DrawBox(vars.showTeam, (float*)vars.boxEnnemiColor, (float*)vars.boxTeamColor);
+        }
+
+        ImGui::Checkbox("Show team", &vars.showTeam);
+        ImGui::SameLine(200);
+        ImGui::ColorEdit3("BoxTeamColor", vars.boxTeamColor, ImGuiColorEditFlags_NoInputs);
+
+
         ImGui::Checkbox("Lines ESP", &vars.linesESP);
         if (vars.linesESP)
         {
-            esp.DrawLines(); // Appelé en continu tant que la case est cochée
+            esp.DrawLines(vars.showTeam, (float*)vars.boxEnnemiColor);
         }
         
-
         ImGui::SameLine(200);
-        ImGui::ColorEdit3("##BoxColor", (float*)&vars.showMenu, ImGuiColorEditFlags_NoInputs);
+        ImGui::ColorEdit3("BoxColor", vars.boxEnnemiColor, ImGuiColorEditFlags_NoInputs);
         ImGui::Checkbox("Skeleton", &vars.showMenu);
         ImGui::Checkbox("Health Bar", &vars.showMenu);
         ImGui::Checkbox("Name ESP", &vars.showMenu);

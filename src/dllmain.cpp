@@ -176,6 +176,9 @@ DWORD WINAPI HackThread(HMODULE hModule)
     {
         if (GetAsyncKeyState(VK_END) & 1)
         {
+            MH_DisableHook(MH_ALL_HOOKS);
+            MH_Uninitialize();
+            FreeLibraryAndExitThread(hModule, 0);
             CleanupImGui();
             break;
         }

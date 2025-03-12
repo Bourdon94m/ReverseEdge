@@ -79,9 +79,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Font Include="Fonts\Font Awesome 6 Brands-Regular-400.otf" />
-    <Font Include="Fonts\Font Awesome 6 Free-Regular-400.otf" />
-    <Font Include="Fonts\Font Awesome 6 Free-Solid-900.otf" />
-    <Font Include="Fonts\Roboto.ttf" />
+    <Font Include="Fonts\Roboto\Roboto.ttf" />
   </ItemGroup>
 </Project>
