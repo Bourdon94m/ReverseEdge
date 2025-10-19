@@ -11,6 +11,10 @@
 #include <MISC/MISC.h>
 #include <thread>
 
+#pragma comment(lib, "opengl32.lib")
+
+
+
 // Variables globales
 bool g_initialized = false;
 bool g_wallhack = false;
