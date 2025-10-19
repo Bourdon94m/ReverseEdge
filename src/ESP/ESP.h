@@ -18,6 +18,9 @@ struct Offsets {
 	uintptr_t MkModIsActive = 0x0100;
 	uintptr_t MkModsAmmo = 0x0148;
 	uintptr_t i_team = 0x30C;
+	uintptr_t name = 0x204;
+	uintptr_t viewAngles = 0x34;
+	uintptr_t pos = 0x04;
 
 };
 
@@ -28,19 +31,26 @@ struct Address
 	uintptr_t entList = 0x0018AC04;
 	uintptr_t numOfPlayers = 0x58AC0C;
 
+};
 
-
+struct Ent
+{
+	short team;
 };
 
 class ESP
 {
 public:
 	Vec3 GetEnnemyPos();
-	bool IsEnnemy();
-	bool IsTeammate();
+	//bool IsEnnemy();
+	//bool IsTeammate();
 	void DrawLines(bool showTeam, float* color);
 	int GetPlayersInGame();
 	void DrawBox(bool showTeam, float* EnnemiColor, float* TeamColor);
+	void DrawHealthBar();
+
+
+	//bool isEntTeam(Ent* ent);
 	
 
 };

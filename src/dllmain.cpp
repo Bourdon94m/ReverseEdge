@@ -5,9 +5,11 @@
 #include "MINHOOK/MinHook.h"
 #include "ImGui/backends/imgui_impl_win32.h"
 #include "ImGui/backends/imgui_impl_opengl3.h"
-#include <thread>
-
+#include "ESP/ESP.h"
+#include "AIMBOT/Aimbot.h"
 #include "GUI/gui.h"
+#include <MISC/MISC.h>
+#include <thread>
 
 // Variables globales
 bool g_initialized = false;
@@ -17,6 +19,8 @@ HDC g_hdc = nullptr;
 HGLRC g_hglrc = nullptr;
 ImGuiWrapper* gui;
 bool showMenu = true;
+ESP esp;
+Aimbot aimbot;
 
 // Déclaration du gestionnaire de messages ImGui
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -99,12 +103,14 @@ wglSwapBuffers_t original_wglSwapBuffers = nullptr;
 // Fonction de swap buffer hookée
 BOOL WINAPI Hooked_wglSwapBuffers(HDC hdc)
 {
+
     // Capturer la fenêtre si pas encore fait
     if (!g_hwnd) {
         g_hwnd = WindowFromDC(hdc);
         g_hdc = hdc;
 
-        if (g_hwnd && !g_initialized) {
+        if (g_hwnd && !g_initialized) 
+        {
             InitImGui(g_hwnd, hdc);
             g_initialized = true;
         }
@@ -119,9 +125,57 @@ BOOL WINAPI Hooked_wglSwapBuffers(HDC hdc)
         wglMakeCurrent(hdc, g_hglrc);
 
 
-        if (showMenu)  gui->RenderGui();
+        // Afficher le menu si nécessaire
+        if (showMenu) {
+            gui->RenderGui();
+        }
+
+        if (!showMenu) // if menu closed we draw functionnalities
+        {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+
+            // ✅ Toujours dessiner les ESP et le FOV, même si le menu est fermé
+            ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+
+            if (vars.espBox) {
+                esp.DrawBox(vars.showTeam, vars.boxEnnemiColor, vars.boxTeamColor);
+            }
+
+            if (vars.showHealthBarEsp)
+            {
+                esp.DrawHealthBar();
+            }
+
+            if (vars.linesESP) 
+            {
+                esp.DrawLines(vars.showTeam, vars.boxEnnemiColor);
+            }
+
+            if (vars.bunnyHop)
+            {
+                std::thread(MISC::BunnyHop).detach();
+            }
+
+            
+
+            if (vars.enableAimbot) 
+            {
+                aimbot.DrawFOV(vars.fovRadius, vars.fovColor, g_hwnd);
+
+                if (GetAsyncKeyState(0x56) & 0x8000)
+                {
+                    aimbot.RunAimbot(vars.fovRadius, vars.smooth);
+                }
+            }
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 
+        }
+       
         // Restaurer le contexte original
         wglMakeCurrent(old_dc, old_context);
     }
@@ -133,6 +187,11 @@ BOOL WINAPI Hooked_wglSwapBuffers(HDC hdc)
 // Thread principal du hack
 DWORD WINAPI HackThread(HMODULE hModule)
 {
+
+    FILE* file;
+    AllocConsole();
+    freopen_s(&file, "CONOUT$", "w", stdout);
+
     // Attendre que le jeu s'initialise
     Sleep(2000);
 
@@ -179,7 +238,6 @@ DWORD WINAPI HackThread(HMODULE hModule)
             MH_DisableHook(MH_ALL_HOOKS);
             MH_Uninitialize();
             FreeLibraryAndExitThread(hModule, 0);
-            CleanupImGui();
             break;
         }
 
@@ -190,15 +248,9 @@ DWORD WINAPI HackThread(HMODULE hModule)
         }
     }
 
-    // Nettoyage
-    if (g_initialized)
-    {
-        CleanupImGui();
-    }
+    FreeConsole();
 
-    MH_DisableHook(MH_ALL_HOOKS);
-    MH_Uninitialize();
-    FreeLibraryAndExitThread(hModule, 0);
+  
     return 0;
 }
 

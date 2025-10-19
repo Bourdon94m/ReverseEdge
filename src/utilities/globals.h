@@ -1,22 +1,23 @@
 #pragma once
-#ifndef GLOBALS_H
-#define GLOBALS_H
-
 #include <windows.h>
-#include <iostream>
+#include "Imgui/imgui.h"
 
 
-class Globals 
+struct ViewAngles
 {
-public:
-	int getWindowHeight(HWND hwnd);
-	int getWindowWidth(HWND hwnd);
-
-
+    float yaw; // X in cartesian 
+    float pitch; // Y in cartesian
 };
 
+class Globals
+{
+public:
+    Globals(HWND hwnd);
 
+    int getWindowWidth();
+    int getWindowHeight();
+    static ImVec2 getMiddleOfTheScreen(HWND hwnd);
 
-
-
-#endif
+private:
+    HWND hwnd; // `hwnd` appartient uniquement à l'instance de `Globals`
+};

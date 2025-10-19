@@ -4,13 +4,14 @@
 #include "../framework.h"
 #include "../utilities/globals.h"
 #include "ImGui/imgui.h"
+#include "GUI/gui.h"
 
 
 HWND hwnd = FindWindowA(NULL, "AssaultCube");
+Globals glob(hwnd);
 
-Globals glo;
-static int WIDTH =  glo.getWindowWidth(hwnd);
-static int HEIGHT = glo.getWindowHeight(hwnd);
+int WIDTH = glob.getWindowWidth();
+int HEIGHT = glob.getWindowHeight();
 
 
 // Adresse de base du module (ac_client.exe)
@@ -20,8 +21,9 @@ Address addr;
 
 int numOfPlayersInGame = *(int*)(addr.numOfPlayers);
 uintptr_t localPlayer = ModuleBaseAddress + addr.localPlayer;
-
 int myPlayerTeam = *(int*)(localPlayer + off.i_team);
+
+
 
 
 // Fonction pour récupérer la position de l'ennemi
@@ -64,6 +66,9 @@ void ESP::DrawLines(bool showTeam, float* color)
     Matrix ViewMatrix = *(Matrix*)(addr.ViewMatrix);
 
     uintptr_t entListBase = *(uintptr_t*)(ModuleBaseAddress + addr.entList);
+    Vec3 playerPos = *(Vec3*)(localPlayer + 0x04);
+
+    std::cout << "[X Y Z]" << playerPos.x << " , " << playerPos.y << " , " << playerPos.z << std::endl;
     
     if (!entListBase) return;
     
@@ -84,7 +89,7 @@ void ESP::DrawLines(bool showTeam, float* color)
                 ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
                 ImU32 entityColor;
 
-                if (entTeam == myPlayerTeam) {
+                if (myPlayerTeam == entTeam) {
                     if (!showTeam) continue; // Ne pas afficher les alliés si showTeam == false
                     entityColor = ImGui::GetColorU32(ImVec4(color[0], color[1], color[2], 1.0f)); // Teammate
 
@@ -96,7 +101,7 @@ void ESP::DrawLines(bool showTeam, float* color)
                 }
 
                 draw_list->AddLine(
-                    ImVec2(WIDTH / 2, HEIGHT),
+                    ImVec2(WIDTH / 2, 0),
                     ImVec2(ScreenCoords.X, ScreenCoords.Y),
                     entityColor,
                     2.0f
@@ -111,8 +116,9 @@ void ESP::DrawLines(bool showTeam, float* color)
 }
 
 // Fonction pour obtenir le nombre de joueurs dans le jeu
-int ESP::GetPlayersInGame() {
-    return *(int*)(addr.numOfPlayers); // Lire directement le nombre de joueurs dans le jeu
+int ESP::GetPlayersInGame() 
+{
+    return *(int*)(addr.numOfPlayers); 
 }
 
 
@@ -131,15 +137,15 @@ void ESP::DrawBox(bool showTeam, float* EnnemiColor, float* TeamColor)
             if (!ent) continue;
 
             int entHealth = *(int*)(ent + off.health);
-            int entTeam = *(int*)(ent + off.i_team);
-            int myPlayerTeam = *(int*)(localPlayer + off.i_team);
+            int entTeam = *(short*)(ent + off.i_team);
+            int myPlayerTeam = *(short*)(localPlayer + off.i_team);
 
             // Récupération des positions 3D
             Vec3 entHeadPos = *(Vec3*)(ent + 0x04); // Position de la tête
             Vec3 entFeetPos = *(Vec3*)(ent + 0x28); // Position des pieds
 
 
-            entHeadPos.z += 2.0f;
+            entHeadPos.z += 1.0f;
 
             if (entHealth <= 0 || entHealth > 100) continue;
 
@@ -160,12 +166,12 @@ void ESP::DrawBox(bool showTeam, float* EnnemiColor, float* TeamColor)
                 if (entTeam == myPlayerTeam)
                 {
                     if (!showTeam) continue;
-                    entityColor = ImGui::GetColorU32(ImVec4(EnnemiColor[0], EnnemiColor[1], EnnemiColor[2], 1.0f));
+                    entityColor = ImGui::GetColorU32(ImVec4(TeamColor[0], TeamColor[1], TeamColor[2], 1.0f));
                 }
 
                 else
                 {
-                    entityColor = ImGui::GetColorU32(ImVec4(TeamColor[0], TeamColor[1], TeamColor[2], 1.0f)); 
+                    entityColor = ImGui::GetColorU32(ImVec4(EnnemiColor[0], EnnemiColor[1], EnnemiColor[2], 1.0f));
                 }
 
                 // Dessin de la boîte bien centrée autour du joueur
@@ -177,10 +183,89 @@ void ESP::DrawBox(bool showTeam, float* EnnemiColor, float* TeamColor)
                     0,
                     3.0f
                 );
+
+
             }
         }
         __except (EXCEPTION_EXECUTE_HANDLER) {
             continue;
         }
+    }
+}
+
+
+void ESP::DrawHealthBar()
+{
+    // Vérification préalable des pointeurs
+    if (!addr.ViewMatrix) return;
+    Matrix ViewMatrix = *(Matrix*)(addr.ViewMatrix);
+    uintptr_t entListBase = *(uintptr_t*)(ModuleBaseAddress + addr.entList);
+
+
+    
+
+    Vec2 ScreenHeadCoords;
+    Vec2 ScreenFeetCoords;
+    
+
+
+    if (!entListBase) return;
+
+    for (int i = 0; i < 32; i++) {
+        // Vérification plus robuste
+
+        __try {
+
+            uintptr_t ent = *(uintptr_t*)(entListBase + i * 0x4);
+            if (!ent) continue;
+
+            int entHealth = *(int*)(ent + off.health);
+            int maxEntHealth = 100;
+            int healthPercent = entHealth / maxEntHealth;
+            if (entHealth <= 0 || entHealth > 100) continue;
+
+            // Team check
+            if ( *(short*)(ent + off.i_team) == *(short*)(localPlayer + off.i_team) ) 
+            {
+                if (!ImGuiWrapper::isTeamCheck)
+                {
+                    continue;
+                }
+            }
+
+            
+            
+
+            Vec3 playerHeadPos = *(Vec3*)(ent + 0x04); // Player head position
+            Vec3 playerFeetPos = *(Vec3*)(ent + 0x28); // Player feet position
+
+            ScreenFeetCoords.Y += 2.0f;
+
+
+            if (WorldToScreen(playerHeadPos, ScreenHeadCoords, ViewMatrix.VMatrix, WIDTH, HEIGHT) &&
+                WorldToScreen(playerFeetPos, ScreenFeetCoords, ViewMatrix.VMatrix, WIDTH, HEIGHT))
+            {
+
+                float boxHeight = abs(ScreenFeetCoords.Y - ScreenHeadCoords.Y); // Hauteur du joueur
+                float width = boxHeight / 2.0f; // Largeur basée sur la hauteur 
+
+                ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
+                ImU32 entityColor;
+
+
+                draw_list->AddRectFilled(
+                    ImVec2(ScreenHeadCoords.X - width - 5.0f, ScreenFeetCoords.Y - boxHeight),   // coin haut gauche
+                    ImVec2(ScreenHeadCoords.X - width - 5.0f, ScreenFeetCoords.Y),               // coin bas droit
+                    ImGui::GetColorU32(ImVec4(0, 255, 0, 255)),
+                    0.0f
+                );
+
+
+            }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            continue;
+        }
+
     }
 }

@@ -1,30 +1,35 @@
-#include "gui.h"
+ï»¿#include "gui.h"
 #include <iostream>
 
-#include "../ESP/ESP.h"
+#include "ESP/ESP.h"
+#include "AIMBOT/Aimbot.h"
 #include "ImGui/backends/imgui_impl_win32.h"
 #include "ImGui/imgui.h"
 #include "ImGui/backends/imgui_impl_opengl3.h"
+#include <MISC/MISC.h>
 
-ESP esp;
+ESP esp2;
+Aimbot aimbot2;
+CheatVars vars;
+HWND hwnd2 = FindWindowA(NULL, "AssaultCube");
+ImVec2 middle = Globals::getMiddleOfTheScreen(hwnd2);
 
-struct CheatVars {
-    bool showMenu = true;
-    bool showTeam = false;
-    bool espBox = false;
-    bool enableAimbot = false;
-    bool linesESP = false;
-    float fov = 90.0f;
-    float smooth = 5.0f;
-    bool boxESP = false;
-    float boxEnnemiColor[4] = {255.0f, 0.0f, 0.0f, 1.0f};
-    float boxTeamColor[4] = { 0.0f, 255.0f, 0.0f, 1.0f };
-    bool skeleton = false;
-    float espDistance = 500.0f;
-    bool bhop = false;
-    int selectedConfig = 0;
 
-} vars;
+
+bool ImGuiWrapper::isTeamCheck()
+{
+    return vars.showTeam;
+}
+
+bool ImGuiWrapper::isMenuOpen()
+{
+    return vars.showMenu;
+}
+
+bool ImGuiWrapper::showHealthBar()
+{
+    return vars.showHealthBarEsp;
+}
 
 
 void ImGuiWrapper::InitGui(HWND hwnd) {
@@ -34,7 +39,7 @@ void ImGuiWrapper::InitGui(HWND hwnd) {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();  // Supprime toutes les polices existantes
     ImFont* myFont = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/Arial.ttf", 20.0f);
-    io.FontDefault = myFont;  // Définit cette police comme celle par défaut
+    io.FontDefault = myFont;  // DÃ©finit cette police comme celle par dÃ©faut
     io.Fonts->Build();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
@@ -48,7 +53,7 @@ void ImGuiWrapper::InitGui(HWND hwnd) {
 
 
 void ImGuiWrapper::RenderGui() {
-    // Préparer une nouvelle frame ImGui
+    // PrÃ©parer une nouvelle frame ImGui
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
@@ -91,10 +96,11 @@ void ImGuiWrapper::RenderGui() {
     colors[ImGuiCol_TabHovered] = ImVec4(0.00f, 0.83f, 1.00f, 0.80f);
     colors[ImGuiCol_TabActive] = ImVec4(0.00f, 0.83f, 1.00f, 1.00f);
 
-    // Position et taille de la fenêtre ImGui
-    ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Always);
+    // Position et taille de la fenÃªtre ImGui
+    ImGui::SetWindowPos(middle);
+    ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_Always);
 
-    // Début de la fenêtre principale
+    // DÃ©but de la fenÃªtre principale
     ImGui::Begin("ReverseEdge",
         nullptr,
         ImGuiWindowFlags_NoResize |
@@ -102,9 +108,9 @@ void ImGuiWrapper::RenderGui() {
         ImGuiWindowFlags_NoTitleBar
     );
 
-    
+   
 
-    // Création du panneau de gauche dans un Child window
+    // CrÃ©ation du panneau de gauche dans un Child window
     ImGui::BeginChild("Left Panel", ImVec2(150, 0), true);
     static int selected = 0;
     if (ImGui::Selectable("Aimbot", selected == 0)) selected = 0;
@@ -117,39 +123,35 @@ void ImGuiWrapper::RenderGui() {
     ImGui::SameLine();
     ImGui::BeginChild("Content", ImVec2(0, 0), true);
     switch (selected) {
+
+
     case 0: // Aimbot
         ImGui::Text("Aimbot Settings");
         ImGui::Separator();
-        ImGui::Checkbox("Enable Aimbot", &vars.showMenu);
-        ImGui::SliderFloat("FOV", &vars.fov, 0.0f, 180.0f, "%.1f°");
-        ImGui::SliderFloat("Smooth", &vars.smooth, 1.0f, 100.0f, "%.1f");
-        ImGui::Combo("Target", &vars.selectedConfig, "Head\0Chest\0Nearest\0");
-        ImGui::Checkbox("Visible Only", &vars.showMenu);
-        ImGui::Checkbox("Auto Fire", &vars.showMenu);
+        ImGui::Checkbox("Enable Aimbot", &vars.enableAimbot);
+
+        if (vars.enableAimbot)
+        {
+            ImGui::SliderFloat("FOV", &vars.fovRadius, 1.0f, 180.0f, "%.1f");
+            ImGui::SliderFloat("Smooth", &vars.smooth, 1.0f, 100.0f, "%.1f");
+            ImGui::Combo("Target", &vars.selectedConfig, "Head\0Chest\0Nearest\0");
+            ImGui::Checkbox("Visible Only", &vars.showMenu);
+            ImGui::Checkbox("Auto Fire", &vars.showMenu);
+        }
+
         break;
         
     case 1: // Visuals
         ImGui::Text("Visual Settings");
         ImGui::Separator();
         ImGui::Checkbox("Box ESP", &vars.espBox);
-
-        // Draw box
-        if (vars.espBox)
-        {
-            esp.DrawBox(vars.showTeam, (float*)vars.boxEnnemiColor, (float*)vars.boxTeamColor);
-        }
-
-        ImGui::Checkbox("Show team", &vars.showTeam);
+        ImGui::Checkbox("Team check", &vars.showTeam);
         ImGui::SameLine(200);
         ImGui::ColorEdit3("BoxTeamColor", vars.boxTeamColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::Checkbox("HealthBar", &vars.showHealthBarEsp);
 
 
         ImGui::Checkbox("Lines ESP", &vars.linesESP);
-        if (vars.linesESP)
-        {
-            esp.DrawLines(vars.showTeam, (float*)vars.boxEnnemiColor);
-        }
-        
         ImGui::SameLine(200);
         ImGui::ColorEdit3("BoxColor", vars.boxEnnemiColor, ImGuiColorEditFlags_NoInputs);
         ImGui::Checkbox("Skeleton", &vars.showMenu);
@@ -162,7 +164,7 @@ void ImGuiWrapper::RenderGui() {
     case 2: // Misc
         ImGui::Text("Misc Features");
         ImGui::Separator();
-        ImGui::Checkbox("Bunny Hop", &vars.showMenu);
+        if (ImGui::Checkbox("Bunny Hop", &vars.bunnyHop)) MISC::BunnyHop;
         ImGui::Checkbox("Auto Strafe", &vars.showMenu);
         ImGui::Checkbox("No Flash", &vars.showMenu);
         ImGui::SliderFloat("Flash Alpha", &vars.smooth, 0.0f, 255.0f, "%.0f");
@@ -179,11 +181,44 @@ void ImGuiWrapper::RenderGui() {
         ImGui::Spacing();
         ImGui::Text("Configs:");
         break;
+
     }
-    ImGui::EndChild();
 
-    ImGui::End(); // Fin de la fenêtre "ReverseEdge"
 
+    if (vars.espBox) {
+        esp2.DrawBox(vars.showTeam, vars.boxEnnemiColor, vars.boxTeamColor);
+    }
+
+    if (vars.showHealthBarEsp)
+    {
+        esp2.DrawHealthBar();
+    }
+
+    if (vars.linesESP) {
+        esp2.DrawLines(vars.showTeam, vars.boxEnnemiColor);
+    }
+    
+
+    if (vars.enableAimbot) {
+        aimbot2.DrawFOV(vars.fovRadius, vars.fovColor, hwnd2);
+
+        if (GetAsyncKeyState(0x56) & 0x8000)
+        {
+            aimbot2.RunAimbot(vars.fovRadius, vars.smooth);
+        } 
+        
+    }
+
+    //if (vars.bunnyHop)
+    //{
+    //    MISC::BunnyHop();
+    //} 
+
+    
+    ImGui::EndChild();  
+    
+    ImGui::End(); // Fin de la fenÃªtre "ReverseEdge"
+    
     // Rendu final d'ImGui
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -203,22 +238,22 @@ bool ImGuiWrapper::LoadFont(const char* fontPath, float size, const std::string&
         return false;
     }
 
-    // Stocker la police dans une map pour une réutilisation ultérieure
+    // Stocker la police dans une map pour une rÃ©utilisation ultÃ©rieure
     fonts[fontName] = font;
-    std::cout << "Police '" << fontName << "' chargée avec succès." << std::endl;
+    std::cout << "Police '" << fontName << "' chargÃ©e avec succÃ¨s." << std::endl;
     return true;
 }
 
 bool ImGuiWrapper::LoadIconFont(const char* fontPath, float size, const std::string& fontName, ImGuiIO& io, const ImWchar* glyphRanges) {
     ImFont* font = io.Fonts->AddFontFromFileTTF(fontPath, size, nullptr, glyphRanges);
     if (!font) {
-        std::cerr << "Erreur : Impossible de charger la police d'icônes '" << fontPath << "'." << std::endl;
+        std::cerr << "Erreur : Impossible de charger la police d'icÃ´nes '" << fontPath << "'." << std::endl;
         return false;
     }
 
-    // Stocker la police d'icônes dans une map pour une réutilisation ultérieure
+    // Stocker la police d'icÃ´nes dans une map pour une rÃ©utilisation ultÃ©rieure
     fonts[fontName] = font;
-    std::cout << "Police d'icônes '" << fontName << "' chargée avec succès." << std::endl;
+    std::cout << "Police d'icÃ´nes '" << fontName << "' chargÃ©e avec succÃ¨s." << std::endl;
     return true;
 }
 
@@ -227,7 +262,7 @@ void ImGuiWrapper::UseFont(const std::string& fontName) {
         ImGui::PushFont(fonts[fontName]);
     }
     else {
-        std::cerr << "Erreur : Police '" << fontName << "' non trouvée." << std::endl;
+        std::cerr << "Erreur : Police '" << fontName << "' non trouvÃ©e." << std::endl;
     }
 }
 
