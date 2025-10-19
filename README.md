@@ -15,10 +15,9 @@ ReverseEdge is a compact prototype demonstrating how simple game-assist features
 
 ## 🔥 Demo
 
-Insert your demo GIF / video here:
-
 ```
-![demo](https://vimeo.com/1128569502)
+[![Watch the demo](./demo/reverseedge-demo.gif)](https://vimeo.com/1128569502)
+*Click the image to watch the demo on Vimeo.*
 ```
 
 
@@ -77,3 +76,4 @@ git clone https://github.com/Bourdon94m/ReverseEdge.git
 - **Bourdon94m** — https://github.com/Bourdon94m
 
 ---
+
